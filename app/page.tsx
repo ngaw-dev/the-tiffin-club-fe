@@ -1,15 +1,26 @@
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import Image from "next/image";
+import Link from "next/link";
+import { Suspense } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { SiteFooter } from "@/components/site/footer"
-import { SiteHeader } from "@/components/site/header"
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SiteFooter } from "@/components/site/footer";
+import { SiteHeader } from "@/components/site/header";
+import {
+  formatMenuDate,
+  formatMoney,
+  formatTime,
+  getTodayMenu,
+  isOrderingOpen,
+  type TodayMenu,
+} from "@/lib/api";
 
 const steps = [
   {
@@ -27,7 +38,7 @@ const steps = [
     title: "Come back tomorrow",
     body: "Missed it? There's a different dish waiting. Regret is part of the flavor profile.",
   },
-]
+];
 
 export default function Home() {
   return (
@@ -73,53 +84,9 @@ export default function Home() {
 
         {/* Today's dish showcase */}
         <section id="today" className="pb-20 sm:pb-28">
-          <Card className="overflow-hidden rounded-3xl border-ink/5 bg-white shadow-soft">
-            <div className="grid md:grid-cols-2">
-              <div className="relative aspect-[4/3] bg-saffron/20 md:aspect-auto md:min-h-[420px]">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="font-display text-lg text-stone italic">
-                    [ Today&apos;s dish photo ]
-                  </span>
-                </div>
-                <Badge className="absolute top-4 left-4 rounded-full bg-ink px-3 py-1.5 text-xs font-semibold tracking-wider text-cream uppercase">
-                  Available until sold out
-                </Badge>
-              </div>
-              <div className="flex flex-col justify-center p-8 sm:p-12">
-                <p className="text-xs font-semibold tracking-[0.25em] text-stone uppercase">
-                  Today, November 7
-                </p>
-                <h2 className="mt-3 font-display text-3xl leading-tight font-semibold sm:text-4xl lg:text-5xl">
-                  Hand-pulled noodles with burnt scallion oil
-                </h2>
-                <p className="mt-4 leading-relaxed text-stone">
-                  Fourteen pulls, fried scallions gone properly dark, a soft
-                  egg on top. Chef made this on a rainy Tuesday in 2019 and
-                  we&apos;ve never fully let it go.
-                </p>
-                <div className="mt-6 flex items-center gap-4">
-                  <span className="rounded-full bg-ember/10 px-5 py-2 font-display text-2xl font-semibold text-ember tabular-nums">
-                    $14
-                  </span>
-                  <span className="text-sm text-stone">
-                    <span className="font-semibold text-ink tabular-nums">
-                      37
-                    </span>{" "}
-                    of 60 portions left
-                  </span>
-                </div>
-                <Button
-                  className="mt-8 h-auto self-start rounded-full bg-ink px-8 py-3.5 font-semibold text-cream hover:bg-ember"
-                >
-                  Reserve today&apos;s dish
-                </Button>
-                <p className="mt-3 text-center text-xs text-stone">
-                  Pickup 5&ndash;9pm. Miss it, and No. 043 is a mystery to you
-                  too.
-                </p>
-              </div>
-            </div>
-          </Card>
+          <Suspense fallback={<DishCardFallback />}>
+            <TodayShowcase />
+          </Suspense>
         </section>
 
         {/* How it works */}
@@ -199,5 +166,193 @@ export default function Home() {
 
       <SiteFooter />
     </>
-  )
+  );
+}
+
+async function TodayShowcase() {
+  let menu: TodayMenu | null = null;
+  let menuError = false;
+
+  try {
+    menu = await getTodayMenu();
+  } catch {
+    menuError = true;
+  }
+
+  return menu ? <TodayDishCard menu={menu} /> : <NoDishCard unavailable={menuError} />;
+}
+
+function DishCardFallback() {
+  return (
+    <Card className="overflow-hidden rounded-3xl border-ink/5 bg-white shadow-soft">
+      <div className="grid md:grid-cols-2">
+        <div className="aspect-[4/3] bg-saffron/15 md:min-h-[420px]" />
+        <div className="p-8 sm:p-12">
+          <div className="h-4 w-32 rounded bg-sand/70" />
+          <div className="mt-4 h-10 w-3/4 rounded bg-sand/70" />
+          <div className="mt-6 h-20 rounded bg-sand/40" />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function TodayDishCard({ menu }: { menu: TodayMenu }) {
+  const { meal, ordering } = menu;
+  const open = isOrderingOpen(ordering);
+  const pickupWindow = [
+    formatTime(ordering.pickup_window.start),
+    formatTime(ordering.pickup_window.end),
+  ]
+    .filter(Boolean)
+    .join("–");
+
+  return (
+    <Card className="overflow-hidden rounded-3xl border-ink/5 bg-white shadow-soft">
+      <div className="grid md:grid-cols-2">
+        <div className="relative aspect-[4/3] bg-saffron/20 md:aspect-auto md:min-h-[420px]">
+          {meal.photo_url ? (
+            <Image
+              src={meal.photo_url}
+              alt={meal.name}
+              fill
+              className="object-cover"
+              sizes="(min-width: 768px) 50vw, 100vw"
+              priority
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="font-display text-lg text-stone italic">
+                Today&apos;s dish photo
+              </span>
+            </div>
+          )}
+          <Badge className="absolute top-4 left-4 rounded-full bg-ink px-3 py-1.5 text-xs font-semibold tracking-wider text-cream uppercase">
+            {open ? "Ordering open" : "Ordering closed"}
+          </Badge>
+        </div>
+        <div className="flex flex-col justify-center p-8 sm:p-12">
+          <p className="text-xs font-semibold tracking-[0.25em] text-stone uppercase">
+            Today, {formatMenuDate(meal.date)}
+          </p>
+          <h2 className="mt-3 font-display text-3xl leading-tight font-semibold sm:text-4xl lg:text-5xl">
+            {meal.name}
+          </h2>
+          {meal.description && (
+            <p className="mt-4 leading-relaxed text-stone">{meal.description}</p>
+          )}
+          <div className="mt-6 flex flex-wrap items-center gap-4">
+            <span className="rounded-full bg-ember/10 px-5 py-2 font-display text-2xl font-semibold text-ember tabular-nums">
+              {formatMoney(meal.price)}
+            </span>
+            <span className="text-sm text-stone">
+              Up to{" "}
+              <span className="font-semibold text-ink tabular-nums">
+                {meal.max_per_order}
+              </span>{" "}
+              per order
+            </span>
+          </div>
+
+          {meal.extras.length > 0 && (
+            <div className="mt-5">
+              <p className="text-xs font-semibold tracking-[0.2em] text-stone uppercase">
+                Extras
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {meal.extras.map((extra) => (
+                  <span
+                    key={extra.id}
+                    className="rounded-full border border-ink/10 bg-sand/40 px-3 py-1.5 text-sm text-ink"
+                  >
+                    {extra.name}{" "}
+                    <span className="text-stone tabular-nums">
+                      {formatMoney(extra.price)}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {open ? (
+            <>
+              <p className="mt-6 text-sm text-stone">
+                Ordering open
+                {ordering.pickup_open && pickupWindow
+                  ? ` — pickup ${pickupWindow}`
+                  : ""}
+                {ordering.delivery_open ? " · delivery available" : ""}
+                {!ordering.pickup_open && ordering.delivery_open
+                  ? " (pickup closed)"
+                  : ""}
+                {ordering.pickup_open && !ordering.delivery_open
+                  ? " (delivery closed)"
+                  : ""}
+                .
+              </p>
+              <Button
+                asChild
+                className="mt-4 h-auto self-start rounded-full bg-ink px-8 py-3.5 font-semibold text-cream hover:bg-ember"
+              >
+                <Link href="/order">Reserve today&apos;s dish</Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="mt-6 text-sm text-stone">
+                Ordering closed — back at 9am tomorrow.
+              </p>
+              <Button
+                disabled
+                className="mt-4 h-auto self-start rounded-full bg-ink/20 px-8 py-3.5 font-semibold text-stone"
+              >
+                Reserve today&apos;s dish
+              </Button>
+            </>
+          )}
+          <p className="mt-3 text-xs text-stone">
+            {pickupWindow ? `Pickup ${pickupWindow}. ` : ""}
+            Miss it, and tomorrow&apos;s dish is a mystery too.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function NoDishCard({ unavailable }: { unavailable: boolean }) {
+  return (
+    <Card className="overflow-hidden rounded-3xl border-ink/5 bg-white shadow-soft">
+      <div className="grid md:grid-cols-2">
+        <div className="relative aspect-[4/3] bg-saffron/15 md:aspect-auto md:min-h-[320px]">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-display text-lg text-stone italic">
+              No dish photo today
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col justify-center p-8 sm:p-12">
+          <p className="text-xs font-semibold tracking-[0.25em] text-stone uppercase">
+            Today
+          </p>
+          <h2 className="mt-3 font-display text-3xl leading-tight font-semibold sm:text-4xl">
+            No dish today — see you at 9am
+          </h2>
+          <p className="mt-4 leading-relaxed text-stone">
+            {unavailable
+              ? "We couldn’t reach the kitchen menu right now. Try again in a moment."
+              : "The kitchen hasn’t published today’s dish yet. Check back at 9am."}
+          </p>
+          <Button
+            asChild
+            variant="outline"
+            className="mt-8 h-auto self-start rounded-full border-ink/20 px-8 py-3.5 font-semibold hover:border-ink"
+          >
+            <a href="#how">How it works</a>
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
 }
