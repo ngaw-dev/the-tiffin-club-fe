@@ -18,7 +18,11 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Backend API
+
+The frontend reads menu and order data from the Laravel backend (DDEV local) at `API_BASE_URL` (defaults to `http://the-tiffin-box-main.ddev.site`, API prefix `/api/v1`). Copy `.env.example` to `.env.local` to override it; do not commit `.env`. Browser writes and lookups go through server-side Next.js proxy routes (`app/api/orders/route.ts` for order placement, `app/api/orders/[orderNumber]/route.ts` for order lookup) so the backend stays server-to-server and its `{ message, errors, status }` error envelope is preserved.
+
+Local dev uses `http` by default because Next.js fetches the API server-side (Node), and Node may not trust DDEV's mkcert CA, causing TLS verification failures; browsers typically trust the DDEV certificate for `https`. Set `API_BASE_URL=https://the-tiffin-box-main.ddev.site` in `.env.local` if your runtime trusts the certificate.
 
 ## Learn More
 

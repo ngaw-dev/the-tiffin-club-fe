@@ -7,6 +7,18 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "the-tiffin-box-main.ddev.site",
+      },
+      {
+        protocol: "http",
+        hostname: "the-tiffin-box-main.ddev.site",
+      },
+    ],
+  },
   turbopack: {
     rules: {
       "*.css": {
